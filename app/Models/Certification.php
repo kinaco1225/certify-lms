@@ -155,6 +155,20 @@ class Certification extends Model
         };
     }
 
+    /**
+     * 質問掲示板で閲覧・絞り込み対象にできる資格へ絞り込む scope(QaThread::scopeVisibleTo と同じ範囲)。
+     * admin は公開停止中を含む全件、student は公開中すべて、coach は公開中かつ担当資格のみ。
+     */
+    public function scopeVisibleForQaBoard(Builder $query, User $user): Builder
+    {
+        return match ($user->role) {
+            UserRole::Admin => $query,
+            UserRole::Student => $query->published(),
+            UserRole::Coach => $query->published()->assignedTo($user),
+            default => $query->whereRaw('1 = 0'),
+        };
+    }
+
     public function scopeKeyword(Builder $query, ?string $keyword): Builder
     {
         if ($keyword === null || $keyword === '') {
