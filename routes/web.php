@@ -17,6 +17,7 @@ use App\Http\Controllers\EnrollmentManagementController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
 use App\Http\Controllers\MeetingController;
+use App\Http\Controllers\MeetingPackController;
 use App\Http\Controllers\MeetingQuotaHistoryController;
 use App\Http\Controllers\MockExamAnswerController;
 use App\Http\Controllers\MockExamCatalogController;
@@ -478,6 +479,39 @@ Route::middleware(['auth', 'role:admin'])
             ->scopeBindings()
             ->name('replies.destroy');
     });
+
+// ============================================================
+// 管理者専用 — 面談パック管理(追加面談購入用 SKU の CRUD + 状態遷移)
+// ============================================================
+// 【解説】middleware = Controller に届く前に必ず通る「関所」。
+// 【解説】  'auth'       … ログインしていなければログイン画面へ移動させる
+// 【解説】  'role:admin' … 管理者以外(受講生・コーチ)は 403 で拒否する
+// 【解説】prefix('admin') = この中のルートの URL の先頭に /admin を付ける(例: /admin/meeting-packs)。
+// 【解説】group(function () { ... }) = 中に書いたルート全部に、上の middleware と prefix をまとめて適用する。
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+    // URL パラメータ名は Blade / チケットに合わせて {plan}(Controller では MeetingPack $plan で受ける)
+    // 【解説】Route::resource = CRUD 用の 7 本のルートを 1 行で作る便利機能。
+    // 【解説】  GET    /admin/meeting-packs             → index   (一覧)
+    // 【解説】  GET    /admin/meeting-packs/create      → create  (作成フォーム)
+    // 【解説】  POST   /admin/meeting-packs             → store   (作成)
+    // 【解説】  GET    /admin/meeting-packs/{plan}      → show    (詳細)
+    // 【解説】  GET    /admin/meeting-packs/{plan}/edit → edit    (編集フォーム)
+    // 【解説】  PATCH  /admin/meeting-packs/{plan}      → update  (更新)
+    // 【解説】  DELETE /admin/meeting-packs/{plan}      → destroy (削除)
+    Route::resource('meeting-packs', MeetingPackController::class)
+        // 【解説】何もしないと URL のパラメータ名は {meeting_pack} になる。チケットと Blade に合わせて {plan} に変える。
+        ->parameters(['meeting-packs' => 'plan'])
+        // 【解説】ルート名の先頭を admin.meeting-packs にする(例: admin.meeting-packs.index)。Blade の route() と一致させる。
+        ->names('admin.meeting-packs');
+    // 【解説】resource に含まれない状態遷移の 3 本は、個別に POST ルートを書く。
+    // 【解説】[Controller クラス, 'メソッド名'] で「どのメソッドを呼ぶか」を指定し、->name() でルート名を付ける。
+    Route::post('meeting-packs/{plan}/publish', [MeetingPackController::class, 'publish'])
+        ->name('admin.meeting-packs.publish');
+    Route::post('meeting-packs/{plan}/archive', [MeetingPackController::class, 'archive'])
+        ->name('admin.meeting-packs.archive');
+    Route::post('meeting-packs/{plan}/unarchive', [MeetingPackController::class, 'unarchive'])
+        ->name('admin.meeting-packs.unarchive');
+});
 
 // ============================================================
 // コーチ専用ルート — 担当資格受講生管理 / 面談管理 / メモ記録
