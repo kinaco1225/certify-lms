@@ -155,4 +155,43 @@ class PlanTest extends TestCase
         $this->assertSame(6, $fresh->default_meeting_quota);
         $this->assertSame(10, $fresh->sort_order);
     }
+
+    // ---- hasReferences(削除可否の判定に使う) ----
+
+    // 【解説】受講者もプラン履歴もない → false(削除できる候補)。
+    public function test_has_references_is_false_without_users_and_logs(): void
+    {
+        $plan = Plan::factory()->draft()->create();
+
+        $this->assertFalse($plan->hasReferences());
+    }
+
+    // 【解説】受講者が紐づいている → true。
+    public function test_has_references_is_true_with_user(): void
+    {
+        $plan = Plan::factory()->draft()->create();
+        User::factory()->student()->inProgress()->withPlan($plan)->create();
+
+        $this->assertTrue($plan->hasReferences());
+    }
+
+    // 【解説】ソフトデリート(退会など)されたユーザーでも、行は DB に残り外部キーが効くので true になること。
+    public function test_has_references_is_true_with_soft_deleted_user(): void
+    {
+        $plan = Plan::factory()->draft()->create();
+        User::factory()->student()->withdrawn()->withPlan($plan)->create()->delete();
+
+        // 【解説】users リレーション(退会者を除く)では 0 件だが、hasReferences() は true。
+        $this->assertCount(0, $plan->users);
+        $this->assertTrue($plan->hasReferences());
+    }
+
+    // 【解説】受講者はいなくても、プラン履歴が残っていれば true。
+    public function test_has_references_is_true_with_plan_log_only(): void
+    {
+        $plan = Plan::factory()->draft()->create();
+        UserPlanLog::factory()->create(['plan_id' => $plan->id]);
+
+        $this->assertTrue($plan->hasReferences());
+    }
 }

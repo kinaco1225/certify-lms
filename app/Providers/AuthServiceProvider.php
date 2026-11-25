@@ -19,6 +19,7 @@ use App\Models\MockExam;
 use App\Models\MockExamQuestion;
 use App\Models\MockExamSession;
 use App\Models\Part;
+use App\Models\Plan;
 use App\Models\QaReply;
 use App\Models\QaThread;
 use App\Models\QuestionCategory;
@@ -47,6 +48,7 @@ use App\Policies\MockExamQuestionPolicy;
 use App\Policies\MockExamSessionPolicy;
 use App\Policies\PartPolicy;
 use App\Policies\PartViewPolicy;
+use App\Policies\PlanPolicy;
 use App\Policies\QaReplyPolicy;
 use App\Policies\QaThreadPolicy;
 use App\Policies\QuestionCategoryPolicy;
@@ -98,6 +100,8 @@ class AuthServiceProvider extends ServiceProvider
         // 【解説】「MeetingPack の権限チェックは MeetingPackPolicy で行う」という紐付け。
         // 【解説】これがあるので、$user->can('update', $pack) と書くだけで MeetingPackPolicy::update() が呼ばれる。
         MeetingPack::class => MeetingPackPolicy::class,
+        // 【解説】「Plan の権限チェックは PlanPolicy で行う」という紐付け。
+        Plan::class => PlanPolicy::class,
     ];
 
     /**

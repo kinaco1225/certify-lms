@@ -26,6 +26,7 @@ use App\Http\Controllers\MockExamQuestionController;
 use App\Http\Controllers\MockExamSessionController;
 use App\Http\Controllers\MockExamSessionMonitorController;
 use App\Http\Controllers\PartController;
+use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QaBoardModerationController;
 use App\Http\Controllers\QaReplyController;
 use App\Http\Controllers\QaThreadController;
@@ -511,6 +512,25 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
         ->name('admin.meeting-packs.archive');
     Route::post('meeting-packs/{plan}/unarchive', [MeetingPackController::class, 'unarchive'])
         ->name('admin.meeting-packs.unarchive');
+});
+
+// ============================================================
+// 管理者専用 — プラン管理(受講プラン マスタの CRUD + 状態遷移)
+// ============================================================
+// 【解説】auth = ログイン必須、role:admin = 管理者以外は 403。prefix('admin') で URL の先頭に /admin が付く。
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+    // 【解説】Route::resource で CRUD の 7 本(index / create / store / show / edit / update / destroy)をまとめて作る。
+    // 【解説】'plans' から URL のパラメータ名は自動で {plan} になるので、面談パックのような ->parameters() は不要。
+    // 【解説】update は PUT と PATCH の両方で受け付けるので、編集フォームの @method('PUT') もそのまま動く。
+    Route::resource('plans', PlanController::class)
+        ->names('admin.plans');
+    // 【解説】resource に含まれない状態遷移の 3 本は、個別に POST ルートを書く。
+    Route::post('plans/{plan}/publish', [PlanController::class, 'publish'])
+        ->name('admin.plans.publish');
+    Route::post('plans/{plan}/archive', [PlanController::class, 'archive'])
+        ->name('admin.plans.archive');
+    Route::post('plans/{plan}/unarchive', [PlanController::class, 'unarchive'])
+        ->name('admin.plans.unarchive');
 });
 
 // ============================================================
