@@ -74,6 +74,24 @@ class Plan extends Model
     }
 
     /**
+     * 受講者(ソフトデリート済みを含む)またはプラン履歴から参照されているか。
+     *
+     * users.plan_id / user_plan_logs.plan_id はどちらも restrictOnDelete のため、参照が 1 件でもあると
+     * DB が削除を拒否する。削除可否の判定(PlanPolicy::delete / Plan\DestroyAction)で共通に使う。
+     */
+    // 【解説】Policy と DestroyAction の 2 か所で同じ判定を使うので、モデルに 1 つだけ書いておく(判定の食い違いを防ぐ)。
+    public function hasReferences(): bool
+    {
+        // 【解説】$this->users() のようにカッコ付きで呼ぶと、データではなく「SQL を組み立てるクエリ」が返る。
+        // 【解説】withTrashed() = ソフトデリート(論理削除)されたユーザーも含める。
+        // 【解説】  退会などで deleted_at が入ったユーザーも行は DB に残っていて、外部キーの制約が効くため含める必要がある。
+        // 【解説】exists() = 1 件でもあれば true。件数を数える count() より速い(見つかった時点で終わる)。
+        // 【解説】|| = 「または」。左側が true なら右側は実行されない。
+        return $this->users()->withTrashed()->exists()
+            || $this->userPlanLogs()->exists();
+    }
+
+    /**
      * @param Builder<Plan> $query
      *
      * @return Builder<Plan>
