@@ -9,6 +9,8 @@ use App\Models\ChatMember;
 use App\Models\ChatMessage;
 use App\Models\ChatRoom;
 use App\Models\User;
+use App\Notifications\Chat\ChatMessageReceivedNotification;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,9 +20,13 @@ use Illuminate\Support\Facades\DB;
  * - 送信者自身の `ChatMember.last_read_at = now()` を UPDATE(自分のメッセージは未読としてカウントしない)
  * - 通信失敗が DB 整合性に波及しないよう Pusher Broadcast は `DB::afterCommit()` で送る
  * - 担当コーチ未割当の判定は Controller 側で実施済(`CertificationCoachNotAssignedForChatException` 振り分け)
+ * - 送信者以外のルームメンバーへ ChatMessageReceivedNotification を送る(NotificationService がコミット後に送信)
  */
 final class StoreMessageAction
 {
+    // 【解説】Laravel が NotificationService を自動で作って渡してくれる(コンストラクタ・インジェクション)。
+    public function __construct(private readonly NotificationService $notifications) {}
+
     /**
      * @param array{body: string} $validated
      */
@@ -41,6 +47,14 @@ final class StoreMessageAction
             DB::afterCommit(function () use ($message): void {
                 broadcast(new ChatMessageSent($message->load('sender')))->toOthers();
             });
+
+            // 【解説】このルームのメンバーのうち、送信者以外のユーザーを取り出して通知する。
+            // 【解説】whereIn('id', サブクエリ) = chat_members から「このルームの user_id」を取り出し、その id のユーザーに絞る。
+            $recipients = User::query()
+                ->whereIn('id', ChatMember::query()->where('chat_room_id', $room->id)->select('user_id'))
+                ->whereKeyNot($sender->id)
+                ->get();
+            $this->notifications->send($recipients, new ChatMessageReceivedNotification($message));
 
             return $message;
         });

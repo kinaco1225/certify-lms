@@ -20,9 +20,12 @@ use App\Models\Enrollment;
 use App\Models\Meeting;
 use App\Models\MeetingMemo;
 use App\Models\User;
+use App\Notifications\Mentoring\MeetingCanceledNotification;
+use App\Notifications\Mentoring\MeetingReservedNotification;
 use App\Services\CoachMeetingLoadService;
 use App\Services\MeetingAvailabilityService;
 use App\Services\MeetingQuotaService;
+use App\Services\NotificationService;
 use App\UseCases\MeetingQuota\ConsumeQuotaAction;
 use App\UseCases\MeetingQuota\RefundQuotaAction;
 use Carbon\Carbon;
@@ -167,6 +170,7 @@ class MeetingController extends Controller
         CoachMeetingLoadService $coachLoadService,
         MeetingQuotaService $quotaService,
         ConsumeQuotaAction $consumeAction,
+        NotificationService $notifications,
     ): RedirectResponse {
         $scheduledAt = Carbon::parse($request->validated('scheduled_at'));
         $topic = $request->validated('topic');
@@ -216,6 +220,9 @@ class MeetingController extends Controller
             return $meeting->fresh();
         });
 
+        // 【解説】予約が確定したので、割り当てられたコーチに通知する(トランザクションの外なので、すぐに送られる)。
+        $notifications->send($meeting->coach, new MeetingReservedNotification($meeting));
+
         return redirect()
             ->route('meetings.show', $meeting)
             ->with('success', '面談を予約しました。');
@@ -228,6 +235,7 @@ class MeetingController extends Controller
     public function cancel(
         Meeting $meeting,
         RefundQuotaAction $refundAction,
+        NotificationService $notifications,
     ): RedirectResponse {
         $this->authorize('cancel', $meeting);
 
@@ -249,6 +257,12 @@ class MeetingController extends Controller
                 'canceled_at' => now(),
             ]);
         });
+
+        // 【解説】キャンセルしなかった側に通知する。受講生がキャンセルしたらコーチへ、コーチがキャンセルしたら受講生へ。
+        // 【解説】三項演算子: 条件 ? 真のとき : 偽のとき。
+        $recipient = $actor->id === $meeting->student_id ? $meeting->coach : $meeting->student;
+        // 【解説】$meeting はキャンセル前に読み込んだものなので、fresh() で DB から最新(canceled)を読み直して渡す。
+        $notifications->send($recipient, new MeetingCanceledNotification($meeting->fresh(), $actor));
 
         return redirect()
             ->route('meetings.show', $meeting)
