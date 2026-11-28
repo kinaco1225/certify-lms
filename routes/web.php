@@ -25,6 +25,7 @@ use App\Http\Controllers\MockExamController;
 use App\Http\Controllers\MockExamQuestionController;
 use App\Http\Controllers\MockExamSessionController;
 use App\Http\Controllers\MockExamSessionMonitorController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PartController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QaBoardModerationController;
@@ -407,6 +408,17 @@ Route::middleware(['auth', 'role:student', 'active-learning'])->group(function (
 Route::middleware('auth')->group(function () {
     Route::get('meetings/{meeting}', [MeetingController::class, 'show'])->name('meetings.show');
     Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])->name('meetings.cancel');
+});
+
+// ============================================================
+// 認証ユーザー共通 — 通知一覧 / 既読化(本人宛の通知のみ)
+// ============================================================
+// 【解説】auth だけを付ける(active-learning は付けない)。卒業したユーザーも過去の通知一覧は見られる。
+Route::middleware('auth')->prefix('notifications')->name('notifications.')->group(function () {
+    Route::get('/', [NotificationController::class, 'index'])->name('index');
+    // 【解説】read-all は {notification} より前に書く。後に書くと 'read-all' が通知の ID として扱われるおそれがあるため。
+    Route::post('read-all', [NotificationController::class, 'markAllAsRead'])->name('markAllAsRead');
+    Route::post('{notification}/read', [NotificationController::class, 'markAsRead'])->name('markAsRead');
 });
 
 // ============================================================

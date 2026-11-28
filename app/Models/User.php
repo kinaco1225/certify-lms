@@ -299,6 +299,21 @@ class User extends Authenticatable
     }
 
     /**
+     * アプリ内通知 / メール通知の受信対象か。受講中(in_progress)の受講生・コーチのみ true。
+     *
+     * 卒業 / 退会 / 招待中のユーザーと管理者には通知を送らない(管理者向け通知は MVP の対象外)。
+     * 判定は NotificationService で全通知共通に使う。
+     */
+    // 【解説】「誰に通知を送ってよいか」のルールをユーザー側に 1 つだけ書いておき、すべての通知で使い回す。
+    public function canReceiveNotifications(): bool
+    {
+        // 【解説】in_array(値, 配列, true) = 値が配列の中にあるか。第 3 引数 true で「型まで同じか」を厳密に比べる。
+        // 【解説】&& = 「かつ」。ロールが受講生かコーチで、かつ状態が受講中のときだけ true。
+        return in_array($this->role, [UserRole::Student, UserRole::Coach], true)
+            && $this->status === UserStatus::InProgress;
+    }
+
+    /**
      * 受講中(in_progress) と 卒業(graduated) を「ログイン可能 = 活動アカウント」として扱うスコープ。
      * Fortify の認証通過判定や、管理画面の active 集計に使う。
      *
